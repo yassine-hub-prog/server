@@ -1,7 +1,10 @@
 const supabase = require('./supabase');
 const express = require('express');
+const cors = require('cors');
 
 const app = express();
+
+app.use(cors());
 
 app.get('/api/profile/:userId', async (req, res) => {
     try {
