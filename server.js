@@ -155,6 +155,7 @@ app.get('/api/contact/:userId', async (req, res) => {
             const { data: messageCountData, error: messageCountError } = await supabase
                 .from('message')
                 .select('id')
+                .eq('statue', false)
                 .eq('toid', userId)
                 .eq('fromid', id);
 
