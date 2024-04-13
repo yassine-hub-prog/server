@@ -169,7 +169,7 @@ app.get('/api/contact/:userId', async (req, res) => {
                     .select('username, avatar, uuid')
                     .eq('uuid', id)
                     .single(),
-                lastMessage: lastMessageData ? lastMessageData.message : null,
+                lastMessage: lastMessageData,
                 messageCount: messageCountData.length,
             };
         });
