@@ -77,7 +77,7 @@ app.get('/api/profile/:userId', async (req, res) => {
         // Récupérer le nombre de posts de type "shorts"
         const { data: shortsPostsData, error: shortsPostsError } = await supabase
             .from('post')
-            .select('id, src')
+            .select('id, src, text')
             .eq('type', 'video')
             .eq('uuid', userId);
 
