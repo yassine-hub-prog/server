@@ -141,11 +141,10 @@ app.get('/api/contact/:userId', async (req, res) => {
             const { data: lastMessageData, error: lastMessageError } = await supabase
                 .from('message')
                 .select('message, created_at')
-                .eq('statue', false)
                 .eq('toid', userId)
                 .eq('fromid', id)
                 .order('created_at', { ascending: false })
-                .limit(1);
+                .limit(1)
 
             if (lastMessageError) {
                 throw lastMessageError;
