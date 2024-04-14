@@ -1,10 +1,23 @@
 const supabase = require('./supabase');
+const hashtags = require('./hashtags.json');
+
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 
 app.use(cors());
+
+app.get('/api/hashtags', (req, res) => {
+    try {
+        res.status(200).json(hashtags); // Envoyer tous les hashtags au format JSON
+    } catch (error) {
+        console.error('Erreur:', error.message);
+        res.status(500).send('Erreur lors de la récupération des hashtags.');
+    }
+});
+
+
 
 app.get('/api/profile/:userId', async (req, res) => {
     try {
