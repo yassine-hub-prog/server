@@ -1,23 +1,10 @@
 const supabase = require('./supabase');
-const hashtags = require('./hashtags.json');
-
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 
 app.use(cors());
-
-app.get('/api/hashtags', (req, res) => {
-    try {
-        res.status(200).json(hashtags); // Envoyer tous les hashtags au format JSON
-    } catch (error) {
-        console.error('Erreur:', error.message);
-        res.status(500).send('Erreur lors de la récupération des hashtags.');
-    }
-});
-
-
 
 app.get('/api/profile/:userId', async (req, res) => {
     try {
@@ -130,7 +117,6 @@ app.get('/api/profile/:userId', async (req, res) => {
 
 
 
-
 app.get('/api/contact/:userId', async (req, res) => {
     
     try {
@@ -155,9 +141,11 @@ app.get('/api/contact/:userId', async (req, res) => {
             const { data: lastMessageData, error: lastMessageError } = await supabase
                 .from('message')
                 .select('message, created_at')
-                .or(`and(fromid.eq.${id},toid.eq.${userId}),and(fromid.eq.${userId},toid.eq.${id})`)
+                .eq('toid', userId)
+                .eq('fromid', id)
                 .order('created_at', { ascending: false })
                 .limit(1)
+
             if (lastMessageError) {
                 throw lastMessageError;
             }
@@ -174,17 +162,12 @@ app.get('/api/contact/:userId', async (req, res) => {
                 throw messageCountError;
             }
 
-            const { data: contactuserinfos , error: contactuserinfoserror} = await supabase
-                .from('users_infos')
-                .select('username, avatar, uuid')
-                .eq('uuid', id)
-                .single();
-
-            if(contactuserinfoserror) {
-                throw contactuserinfoserror;
-            }
             return {
-                userInfo: contactuserinfos,
+                userInfo: await supabase
+                    .from('users_infos')
+                    .select('username, avatar, uuid')
+                    .eq('uuid', id)
+                    .single(),
                 lastMessage: lastMessageData,
                 messageCount: messageCountData.length,
             };
@@ -192,22 +175,14 @@ app.get('/api/contact/:userId', async (req, res) => {
 
         // Attendre que toutes les requêtes pour les informations des utilisateurs suivis soient terminées
         const usersInfoResults = await Promise.all(usersInfoPromises);
+
+        // Calculer le nombre total de messages
         const totalMessages = usersInfoResults.reduce((acc, cur) => acc + cur.messageCount, 0);
-        // Trier les contacts par ordre décroissant de la date du dernier message
-        const sortedContacts = usersInfoResults.sort((a, b) => {
-            const lastMessageA = a.lastMessage[0]; // Supposant qu'il y a toujours un dernier message
-            const lastMessageB = b.lastMessage[0]; // Supposant qu'il y a toujours un dernier message
 
-            if (!lastMessageA || !lastMessageB) {
-                return 0; // Si l'un des contacts n'a pas de dernier message, la comparaison est neutre
-            }
-
-            // Comparer les dates des derniers messages pour le tri
-            return new Date(lastMessageB.created_at) - new Date(lastMessageA.created_at);
-        });
+        // Trier les contacts par ordre décroissant du nombre de messages
+        const sortedContacts = usersInfoResults.sort((a, b) => b.messageCount - a.messageCount);
 
         res.status(200).json({ contacts: sortedContacts, totalMessages });
-
     } catch (error) {
         console.error('Erreur:', error.message);
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
@@ -243,105 +218,179 @@ app.get('/api/posts/following/:userId', async (req, res) => {
             return res.status(500).send('Erreur lors de la récupération des posts depuis Supabase.');
         }
 
-        if (allPostsData.length > 0) {
-            // Insérer un post publicitaire (ads) après chaque groupe de deux posts
-            const postsWithAdsAndRecommendations = [];
-            for (let i = 0; i < allPostsData.length; i++) {
-                postsWithAdsAndRecommendations.push(allPostsData[i]);
-
-                // Insérer les recommandations après chaque groupe de deux posts
-                if ((i + 1) % 2 === 0 && i !== allPostsData.length - 1) {
-                    // Récupérer 5 utilisateurs recommandés
-                    const { data: recommendedUsersData, error: recommendedUsersError } = await supabase
-                        .from('users_infos_random')
-                        .select('username, avatar, badge')
-                        .limit(10); // Limiter à 5 utilisateurs recommandés
-
-                    if (recommendedUsersError) {
-                        console.error('Erreur lors de la récupération des utilisateurs recommandés depuis Supabase:', recommendedUsersError.message);
-                        return res.status(500).send('Erreur lors de la récupération des utilisateurs recommandés depuis Supabase.');
-                    }
-
-                    const recommendedUsers = recommendedUsersData.map(user => ({
-                        username: user.username,
-                        avatar: user.avatar,
-                        badge: user.badge
-                    }));
-
-                    // Ajouter les utilisateurs recommandés à la liste des posts avec publicités et recommandations
-                    postsWithAdsAndRecommendations.push({ recommendedUsers });
-                }
-
-                // Insérer un post publicitaire (ads) après chaque groupe de deux posts
-                if ((i + 1) % 4 === 0 && i !== allPostsData.length - 1) {
-                    // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
-                    const today = new Date().toISOString().split('T')[0]; // Date actuelle au format ISO YYYY-MM-DD
-                    const { data: adsData, error: adsError } = await supabase
-                        .from('ads_random')
-                        .lte('start_date', today) // Start date <= date actuelle
-                        .gte('end_date', today) // End date >= date actuelle
-                        .select('id, title, description, ad_type, src, uuid, website, country')
-                        .limit(1);
-
-                    if (adsError) {
-                        console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
-                        return res.status(500).send('Erreur lors de la récupération du post publicitaire depuis Supabase.');
-                    }
-
-                    const adData = adsData[0]; // Récupérer les données du post publicitaire
-
-                    // Récupérer les informations de l'utilisateur qui a posté le post publicitaire
-                    const { data: userData, error: userError } = await supabase
-                        .from('users_infos')
-                        .select('username, avatar, badge') // Ajouter les champs que vous souhaitez récupérer
-                        .eq('uuid', adData.uuid)
-                        .single();
-
-                    if (userError) {
-                        console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
-                        return res.status(500).send('Erreur lors de la récupération des informations utilisateur depuis Supabase.');
-                    }
-
-                    // Ajouter les informations de l'utilisateur à l'annonce publicitaire
-                    postsWithAdsAndRecommendations.push({
-                        id: adData.id,
-                        uuid: adData.uuid,
-                        title: adData.title,
-                        content: adData.description,
-                        type: adData.ad_type,
-                        src: adData.src,
-                        website: adData.website,
-                        user: { username: userData.username, avatar: userData.avatar, badge: userData.badge }
-                    });
-                }
-            }
-
-            res.status(200).json({ posts: postsWithAdsAndRecommendations });
-        } else {
-            // S'il n'y a pas de posts, afficher uniquement les utilisateurs recommandés
-            const { data: recommendedUsersData, error: recommendedUsersError } = await supabase
-                .from('users_infos_random')
+        // Récupérer les informations de chaque utilisateur qui a posté un message
+        const usersInfoPromises = allPostsData.map(async post => {
+            const { data: userInfo, error: userError } = await supabase
+                .from('users_infos')
                 .select('username, avatar, badge')
-                .limit(10); // Limiter à 5 utilisateurs recommandés
+                .eq('uuid', post.uuid)
+                .single();
 
-            if (recommendedUsersError) {
-                console.error('Erreur lors de la récupération des utilisateurs recommandés depuis Supabase:', recommendedUsersError.message);
-                return res.status(500).send('Erreur lors de la récupération des utilisateurs recommandés depuis Supabase.');
+            if (userError) {
+                console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                return null; // Ignorer cet utilisateur s'il y a une erreur
             }
 
-            const recommendedUsers = recommendedUsersData.map(user => ({
-                username: user.username,
-                avatar: user.avatar,
-                badge: user.badge
-            }));
+            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge };
+        });
 
-            res.status(200).json({ recommendedUsers });
+        // Attendre que toutes les requêtes pour les informations des utilisateurs soient terminées
+        const usersInfoResults = await Promise.all(usersInfoPromises);
+
+        // Ajouter les informations de l'utilisateur à chaque post
+        allPostsData.forEach((post, index) => {
+            post.user = usersInfoResults[index];
+        });
+
+        // Récupérer le nombre de likes pour chaque post depuis la table likes
+        const likesPromises = allPostsData.map(async post => {
+            const { data: likesData, error: likesError } = await supabase
+                .from('like')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (likesError) {
+                console.error('Erreur lors de la récupération des likes depuis Supabase:', likesError.message);
+                return 0; // Retourner 0 likes en cas d'erreur
+            }
+
+            return likesData.length; // Nombre de likes pour ce post
+        });
+
+        // Attendre que toutes les requêtes pour les likes soient terminées
+        const likesResults = await Promise.all(likesPromises);
+
+        // Ajouter le nombre de likes à chaque post
+        allPostsData.forEach((post, index) => {
+            post.likesCount = likesResults[index];
+        });
+
+
+        
+        // Vérifier si l'utilisateur a déjà aimé chaque post
+        const userLikesPromises = allPostsData.map(async post => {
+            const { data: userLikesData, error: userLikesError } = await supabase
+                .from('like')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('user_id', userId);
+
+            if (userLikesError) {
+                console.error('Erreur lors de la récupération des likes de l\'utilisateur depuis Supabase:', userLikesError.message);
+                return false; // Retourner false en cas d'erreur ou si l'utilisateur n'a pas aimé le post
+            }
+
+            return userLikesData.length > 0; // Vrai si l'utilisateur a aimé le post, faux sinon
+        });
+
+        // Attendre que toutes les requêtes pour les likes de l'utilisateur soient terminées
+        const userLikesResults = await Promise.all(userLikesPromises);
+
+        // Ajouter l'information si l'utilisateur a aimé chaque post
+        allPostsData.forEach((post, index) => {
+            post.userLiked = userLikesResults[index];
+        });
+
+        // Sélectionner un commentaire aléatoire pour chaque post
+        const randomCommentsPromises = allPostsData.map(async post => {
+            const { data: randomCommentData, error: randomCommentError } = await supabase
+                .from('comments')
+                .select('comment')
+                .eq('post_id', post.id)
+                .limit(1)
+
+            if (randomCommentError) {
+                console.error('Erreur lors de la récupération d\'un commentaire aléatoire depuis Supabase:', randomCommentError.message);
+                return null; // Retourner null en cas d'erreur
+            }
+
+            return randomCommentData[0]?.comment || null; // Commentaire aléatoire ou null s'il n'y a pas de commentaire
+        });
+
+        // Attendre que toutes les requêtes pour les commentaires aléatoires soient terminées
+        const randomCommentsResults = await Promise.all(randomCommentsPromises);
+
+        // Ajouter le commentaire aléatoire à chaque post
+        allPostsData.forEach((post, index) => {
+            post.randomComment = randomCommentsResults[index];
+        });
+
+        // Récupérer le nombre de commentaires pour chaque post depuis la table comments
+        const commentsPromises = allPostsData.map(async post => {
+            const { data: commentsData, error: commentsError } = await supabase
+                .from('comments')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (commentsError) {
+                console.error('Erreur lors de la récupération des commentaires depuis Supabase:', commentsError.message);
+                return 0; // Retourner 0 commentaires en cas d'erreur
+            }
+
+            return commentsData.length; // Nombre de commentaires pour ce post
+        });
+
+        // Attendre que toutes les requêtes pour les commentaires soient terminées
+        const commentsResults = await Promise.all(commentsPromises);
+
+        // Ajouter le nombre de commentaires à chaque post
+        allPostsData.forEach((post, index) => {
+            post.commentsCount = commentsResults[index];
+        });
+
+        
+        // Insérer un post publicitaire (ads) après chaque groupe de deux posts
+        const postsWithAds = [];
+        for (let i = 0; i < allPostsData.length; i++) {
+            postsWithAds.push(allPostsData[i]);
+            if ((i + 1) % 4 === 0 && i !== allPostsData.length - 1) {
+                // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
+                const { data: adsData, error: adsError } = await supabase
+                    .from('adsrandom')
+                    .select('id, title, description, ad_type, URL, uuid, website, country')
+                    .limit(1);
+
+                if (adsError) {
+                    console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
+                    return res.status(500).send('Erreur lors de la récupération du post publicitaire depuis Supabase.');
+                }
+
+                const adData = adsData[0]; // Récupérer les données du post publicitaire
+
+                // Récupérer les informations de l'utilisateur qui a posté le post publicitaire
+                const { data: userData, error: userError } = await supabase
+                    .from('users_infos')
+                    .select('username, avatar, badge') // Ajouter les champs que vous souhaitez récupérer
+                    .eq('uuid', adData.uuid)
+                    .single();
+
+                if (userError) {
+                    console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                    return res.status(500).send('Erreur lors de la récupération des informations utilisateur depuis Supabase.');
+                }
+
+                // Ajouter les informations de l'utilisateur à l'annonce publicitaire
+                postsWithAds.push({
+                    id: adData.id,
+                    uuid: adData.uuid,
+                    title: adData.title,
+                    content: adData.description,
+                    type: adData.ad_type,
+                    url: adData.URL,
+                    website: adData.website,
+                    user: { username: userData.username, avatar: userData.avatar, badge: userData.badge }
+                });
+            }
         }
+
+
+        res.status(200).json({ posts: postsWithAds });
     } catch (error) {
         console.error('Erreur:', error.message);
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
+
 
 
 
