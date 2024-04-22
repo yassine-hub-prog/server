@@ -130,6 +130,7 @@ app.get('/api/profile/:userId', async (req, res) => {
 
 
 
+
 app.get('/api/contact/:userId', async (req, res) => {
     
     try {
@@ -154,11 +155,9 @@ app.get('/api/contact/:userId', async (req, res) => {
             const { data: lastMessageData, error: lastMessageError } = await supabase
                 .from('message')
                 .select('message, created_at')
-                .eq('toid', userId)
-                .eq('fromid', id)
+                .or(`and(fromid.eq.${id},toid.eq.${userId}),and(fromid.eq.${userId},toid.eq.${id})`)
                 .order('created_at', { ascending: false })
                 .limit(1)
-
             if (lastMessageError) {
                 throw lastMessageError;
             }
@@ -175,12 +174,17 @@ app.get('/api/contact/:userId', async (req, res) => {
                 throw messageCountError;
             }
 
+            const { data: contactuserinfos , error: contactuserinfoserror} = await supabase
+                .from('users_infos')
+                .select('username, avatar, uuid')
+                .eq('uuid', id)
+                .single();
+
+            if(contactuserinfoserror) {
+                throw contactuserinfoserror;
+            }
             return {
-                userInfo: await supabase
-                    .from('users_infos')
-                    .select('username, avatar, uuid')
-                    .eq('uuid', id)
-                    .single(),
+                userInfo: contactuserinfos,
                 lastMessage: lastMessageData,
                 messageCount: messageCountData.length,
             };
@@ -188,14 +192,22 @@ app.get('/api/contact/:userId', async (req, res) => {
 
         // Attendre que toutes les requêtes pour les informations des utilisateurs suivis soient terminées
         const usersInfoResults = await Promise.all(usersInfoPromises);
-
-        // Calculer le nombre total de messages
         const totalMessages = usersInfoResults.reduce((acc, cur) => acc + cur.messageCount, 0);
+        // Trier les contacts par ordre décroissant de la date du dernier message
+        const sortedContacts = usersInfoResults.sort((a, b) => {
+            const lastMessageA = a.lastMessage[0]; // Supposant qu'il y a toujours un dernier message
+            const lastMessageB = b.lastMessage[0]; // Supposant qu'il y a toujours un dernier message
 
-        // Trier les contacts par ordre décroissant du nombre de messages
-        const sortedContacts = usersInfoResults.sort((a, b) => b.messageCount - a.messageCount);
+            if (!lastMessageA || !lastMessageB) {
+                return 0; // Si l'un des contacts n'a pas de dernier message, la comparaison est neutre
+            }
+
+            // Comparer les dates des derniers messages pour le tri
+            return new Date(lastMessageB.created_at) - new Date(lastMessageA.created_at);
+        });
 
         res.status(200).json({ contacts: sortedContacts, totalMessages });
+
     } catch (error) {
         console.error('Erreur:', error.message);
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
