@@ -366,7 +366,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
 
                 if (adsError) {
                     console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
-                    return res.status(500).send('Erreur lors de la récupération du post publicitaire depuis Supabase.');
+                    return res.status(500).send('Erreur lors de la récupération du post publicitaire depuis Supabase.', adsError.message);
                 }
 
                 const adData = adsData[0]; // Récupérer les données du post publicitaire
