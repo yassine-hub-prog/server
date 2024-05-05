@@ -360,7 +360,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
             if ((i + 1) % 4 === 0 && i !== allPostsData.length - 1) {
                 // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
                 const { data: adsData, error: adsError } = await supabase
-                    .from('adsrandom')
+                    .from('ads_random')
                     .select('id, title, description, ad_type, src, uuid, website, country')
                     .limit(1);
 
