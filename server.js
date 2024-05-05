@@ -361,7 +361,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
                 const { data: adsData, error: adsError } = await supabase
                     .from('adsrandom')
-                    .select('id, title, description, ad_type, URL, uuid, website, country')
+                    .select('id, title, description, ad_type, src, uuid, website, country')
                     .limit(1);
 
                 if (adsError) {
