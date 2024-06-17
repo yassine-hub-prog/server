@@ -409,5 +409,196 @@ app.get('/api/posts/following/:userId', async (req, res) => {
 
 
 
+app.get('/api/shorts/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        // Récupérer tous les posts des utilisateurs suivis depuis la table posts
+        const { data: allPostsData, error: allPostsError } = await supabase
+            .from('posts')
+            .select('id, src, text, type, tage, hashtag, uuid') // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
+            .eq('type', 'video')
+
+        if (allPostsError) {
+            console.error('Erreur lors de la récupération des posts depuis Supabase:', allPostsError.message);
+            return res.status(500).send('Erreur lors de la récupération des posts depuis Supabase.');
+        }
+
+        // Récupérer les informations de chaque utilisateur qui a posté un message
+        const usersInfoPromises = allPostsData.map(async post => {
+            const { data: userInfo, error: userError } = await supabase
+                .from('users_infos')
+                .select('username, avatar, badge')
+                .eq('uuid', post.uuid)
+                .single();
+
+            if (userError) {
+                console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                return null; // Ignorer cet utilisateur s'il y a une erreur
+            }
+
+            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge };
+        });
+
+        // Attendre que toutes les requêtes pour les informations des utilisateurs soient terminées
+        const usersInfoResults = await Promise.all(usersInfoPromises);
+
+        // Ajouter les informations de l'utilisateur à chaque post
+        allPostsData.forEach((post, index) => {
+            post.user = usersInfoResults[index];
+        });
+
+        // Récupérer le nombre de likes pour chaque post depuis la table likes
+        const likesPromises = allPostsData.map(async post => {
+            const { data: likesData, error: likesError } = await supabase
+                .from('like')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (likesError) {
+                console.error('Erreur lors de la récupération des likes depuis Supabase:', likesError.message);
+                return 0; // Retourner 0 likes en cas d'erreur
+            }
+
+            return likesData.length; // Nombre de likes pour ce post
+        });
+
+        // Attendre que toutes les requêtes pour les likes soient terminées
+        const likesResults = await Promise.all(likesPromises);
+
+        // Ajouter le nombre de likes à chaque post
+        allPostsData.forEach((post, index) => {
+            post.likesCount = likesResults[index];
+        });
+
+
+        
+        // Vérifier si l'utilisateur a déjà aimé chaque post
+        const userLikesPromises = allPostsData.map(async post => {
+            const { data: userLikesData, error: userLikesError } = await supabase
+                .from('like')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('user_id', userId);
+
+            if (userLikesError) {
+                console.error('Erreur lors de la récupération des likes de l\'utilisateur depuis Supabase:', userLikesError.message);
+                return false; // Retourner false en cas d'erreur ou si l'utilisateur n'a pas aimé le post
+            }
+
+            return userLikesData.length > 0; // Vrai si l'utilisateur a aimé le post, faux sinon
+        });
+
+        // Attendre que toutes les requêtes pour les likes de l'utilisateur soient terminées
+        const userLikesResults = await Promise.all(userLikesPromises);
+
+        // Ajouter l'information si l'utilisateur a aimé chaque post
+        allPostsData.forEach((post, index) => {
+            post.userLiked = userLikesResults[index];
+        });
+
+        // Sélectionner un commentaire aléatoire pour chaque post
+        const randomCommentsPromises = allPostsData.map(async post => {
+            const { data: randomCommentData, error: randomCommentError } = await supabase
+                .from('comments')
+                .select('comment')
+                .eq('post_id', post.id)
+                .limit(1)
+
+            if (randomCommentError) {
+                console.error('Erreur lors de la récupération d\'un commentaire aléatoire depuis Supabase:', randomCommentError.message);
+                return null; // Retourner null en cas d'erreur
+            }
+
+            return randomCommentData[0]?.comment || null; // Commentaire aléatoire ou null s'il n'y a pas de commentaire
+        });
+
+        // Attendre que toutes les requêtes pour les commentaires aléatoires soient terminées
+        const randomCommentsResults = await Promise.all(randomCommentsPromises);
+
+        // Ajouter le commentaire aléatoire à chaque post
+        allPostsData.forEach((post, index) => {
+            post.randomComment = randomCommentsResults[index];
+        });
+
+        // Récupérer le nombre de commentaires pour chaque post depuis la table comments
+        const commentsPromises = allPostsData.map(async post => {
+            const { data: commentsData, error: commentsError } = await supabase
+                .from('comments')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (commentsError) {
+                console.error('Erreur lors de la récupération des commentaires depuis Supabase:', commentsError.message);
+                return 0; // Retourner 0 commentaires en cas d'erreur
+            }
+
+            return commentsData.length; // Nombre de commentaires pour ce post
+        });
+
+        // Attendre que toutes les requêtes pour les commentaires soient terminées
+        const commentsResults = await Promise.all(commentsPromises);
+
+        // Ajouter le nombre de commentaires à chaque post
+        allPostsData.forEach((post, index) => {
+            post.commentsCount = commentsResults[index];
+        });
+
+        
+        // Insérer un post publicitaire (ads) après chaque groupe de deux posts
+        const postsWithAds = [];
+        for (let i = 0; i < allPostsData.length; i++) {
+            postsWithAds.push(allPostsData[i]);
+            if ((i + 1) % 4 === 0 && i !== allPostsData.length - 1) {
+                // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
+                const { data: adsData, error: adsError } = await supabase
+                    .from('ads_random')
+                    .select('id, title, description, ad_type, src, uuid, website, country')
+                    .limit(1);
+
+                if (adsError) {
+                    console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
+                    return res.status(500).send(adsError);
+                }
+
+                const adData = adsData[0]; // Récupérer les données du post publicitaire
+
+                // Récupérer les informations de l'utilisateur qui a posté le post publicitaire
+                const { data: userData, error: userError } = await supabase
+                    .from('users_infos')
+                    .select('username, avatar, badge') // Ajouter les champs que vous souhaitez récupérer
+                    .eq('uuid', adData.uuid)
+                    .single();
+
+                if (userError) {
+                    console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                    return res.status(500).send('Erreur lors de la récupération des informations utilisateur depuis Supabase.');
+                }
+
+                // Ajouter les informations de l'utilisateur à l'annonce publicitaire
+                postsWithAds.push({
+                    id: adData.id,
+                    uuid: adData.uuid,
+                    title: adData.title,
+                    content: adData.description,
+                    type: adData.ad_type,
+                    url: adData.URL,
+                    website: adData.website,
+                    user: { username: userData.username, avatar: userData.avatar, badge: userData.badge }
+                });
+            }
+        }
+
+
+        res.status(200).json({ posts: postsWithAds });
+    } catch (error) {
+        console.error('Erreur:', error.message);
+        res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
+    }
+});
+
+
+
+
 
 app.listen(3000, () => console.log('Server is listening on port 3000 🚀'));
