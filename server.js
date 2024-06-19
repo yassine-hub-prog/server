@@ -599,6 +599,47 @@ app.get('/api/shorts/:userId', async (req, res) => {
 
 
 
+app.get('/api/comments/:postId', async (req, res) => {
+    try {
+        const postId = req.params.postId;
+        
+
+        const {data: CommentsData, error: CommentsError} = await supabase.from('comments').select('id, comment, uuid').eq('post_id', postId);
+
+        if (CommentsError) {
+            console.error('Erreur lors de la récupération des comments depuis Supabase:', CommentsError.message);
+            return res.status(500).send('Erreur lors de la récupération des comments depuis Supabase.');
+        }
+
+        const usersInfoPromises = CommentsData.map(async comment => {
+            const { data: userInfo, error: userError } = await supabase
+                .from('users_infos')
+                .select('username, avatar, badge')
+                .eq('uuid', comment.uuid)
+                .single();
+
+            if (userError) {
+                console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                return null; // Ignorer cet utilisateur s'il y a une erreur
+            }
+
+            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge };
+        });
+
+        const usersInfoResults = await Promise.all(usersInfoPromises);
+        // Ajouter les informations de l'utilisateur à chaque post
+
+        CommentsData.forEach((comment, index) => {
+            comment.user = usersInfoResults[index];
+        });
+
+        res.status(200).json({ comments: CommentsData });
+    } catch (error) {
+        console.error('Erreur:', error.message);
+        res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
+    }
+});
+
 
 
 app.listen(3000, () => console.log('Server is listening on port 3000 🚀'));
