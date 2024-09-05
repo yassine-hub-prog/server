@@ -13,6 +13,29 @@ app.get('/api/UserSearch/:username', async (req, res) => {
         const { data: userData, error: userError } = await supabase
             .from('users_infos')
             .select('uuid, username, avatar, badge')
+            .ilike('username', '%'+username+'%');
+
+        if (userError) {
+            throw userError;
+        }
+
+        if (!userData || userData.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json(userData);
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching user', error: error.message });
+    }
+});
+
+app.get('/api/UserSearch/:username', async (req, res) => {
+    try {
+        const { username } = req.params; // Fix the parameter name (use "username" instead of "userName")
+
+        const { data: userData, error: userError } = await supabase
+            .from('users_infos')
+            .select('uuid, username, avatar, badge')
             .like('username', '%'+username+'%');
 
         if (userError) {
