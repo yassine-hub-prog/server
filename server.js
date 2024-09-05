@@ -13,7 +13,7 @@ app.get('/api/UserSearch/:username', async (req, res) => {
         const { data: userData, error: userError } = await supabase
             .from('users_infos')
             .select('username, avatar, badge')
-            .eq('username', username);
+            .like('username', '%'+username+'%');
 
         if (userError) {
             throw userError;
