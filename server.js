@@ -31,7 +31,7 @@ app.get('/contact/messages/:contact_id/:userId', async (req, res) => {
       .order('id', { ascending: true });
 
     if (messageError) {
-      return res.status(500).json({ error: 'Erreur lors de la récupération des messages.' });
+      return res.status(500).json({ error: 'Erreur lors de la récupération des messages.' + messageError });
     }
 
       const {data: Update } = await supabase
