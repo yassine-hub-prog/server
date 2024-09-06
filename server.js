@@ -6,21 +6,54 @@ const app = express();
 
 app.use(cors());
 
-app.get('api/contact/:userId/markAsRead/:contactId', async (req, res) => {
-    try {
-        const { userId, contactId } = req.params; // Fix the parameter name (use "username" instead of "userName")
 
-        const {data: Update } = await supabase
+app.get('/contact/messages/:contact_id/:userId', async (req, res) => {
+  const { contact_id } = req.params;
+  const { userId } = req.query; // Assurez-vous de passer l'ID de l'utilisateur via les paramètres de la requête.
+
+  try {
+    // Récupérer les informations du contact
+    const { data: userData, error: userError } = await supabase
+      .from('users_infos')
+      .select('avatar, username, badge')
+      .eq('uuid', contact_id)
+      .single();
+
+    if (userError) {
+      return res.status(500).json({ error: 'Erreur lors de la récupération des infos utilisateur.' });
+    }
+
+    // Récupérer les messages entre les deux utilisateurs
+    const { data: messages, error: messageError } = await supabase
+      .from('message')
+      .select()
+      .or(`and(fromid.eq.${userId},toid.eq.${contact_id}),and(fromid.eq.${contact_id},toid.eq.${userId})`)
+      .order('id', { ascending: true });
+
+    if (messageError) {
+      return res.status(500).json({ error: 'Erreur lors de la récupération des messages.' });
+    }
+
+      const {data: Update } = await supabase
         .from('message')
         .update({ statue: true })
-        .eq('fromid', contactId)
+        .eq('fromid', contact_id)
         .eq('toid', userId)
 
-        return res.status(200).json(Update);
-    } catch (error) {
-        return res.status(500).json({ message: 'Error fetching user' });
-    }
+    // Réponse avec les données de contact et messages
+    res.status(200).json({
+      contactInfo: userData,
+      messages: messages || [],
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération des données:', error.message);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
 });
+
+
+
 
 app.get('/api/UserSearch/:username', async (req, res) => {
     try {
