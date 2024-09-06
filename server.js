@@ -7,9 +7,9 @@ const app = express();
 app.use(cors());
 
 
-app.get('/contact/messages/:contact_id/:userId', async (req, res) => {
+app.get('/contact/:contact_id/messages', async (req, res) => {
   const { contact_id } = req.params;
-  const { userId } = req.query; // Assurez-vous de passer l'ID de l'utilisateur via les paramètres de la requête.
+  const { userId } = req.query;
 
   try {
     // Récupérer les informations du contact
