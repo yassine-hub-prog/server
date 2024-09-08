@@ -238,7 +238,7 @@ app.get('/api/contact/:userId', async (req, res) => {
 
             const { data: contactuserinfos , error: contactuserinfoserror} = await supabase
                 .from('users_infos')
-                .select('username, avatar, uuid')
+                .select('username, avatar, uuid, image_updated_at')
                 .eq('uuid', id)
                 .single();
 
