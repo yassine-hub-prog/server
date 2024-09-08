@@ -465,7 +465,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                     type: adData.ad_type,
                     url: adData.URL,
                     website: adData.website,
-                    user: { username: userData.username, avatar: userData.avatar, badge: userData.badge }
+                    user: { username: userData.username, avatar: userData.avatar, badge: userData.badge, updated_at: userData.image_updated_at }
                 });
             }
         }
