@@ -673,7 +673,7 @@ app.get('/api/shorts/:userId', async (req, res) => {
 
 
 
-app.get('/posts', async (req, res) => {
+app.get('/exploare', async (req, res) => {
   try {
     // Sélectionner tous les posts avec les informations de l'utilisateur associé
     const { data, error } = await supabase
