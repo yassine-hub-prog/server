@@ -86,7 +86,7 @@ app.get('/api/profile/:userId', async (req, res) => {
         // Récupérer les données de l'utilisateur principal
         const { data: userData, error: userError } = await supabase
             .from('users_infos')
-            .select('username, uuid, avatar, bios, badge')
+            .select('username, uuid, avatar, bios, badge, image_updated_at')
             .eq('uuid', userId)
             .single();
 
