@@ -309,7 +309,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
         const usersInfoPromises = allPostsData.map(async post => {
             const { data: userInfo, error: userError } = await supabase
                 .from('users_infos')
-                .select('username, avatar, badge')
+                .select('username, avatar, badge, image_updated_at')
                 .eq('uuid', post.uuid)
                 .single();
 
