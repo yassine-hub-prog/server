@@ -672,6 +672,29 @@ app.get('/api/shorts/:userId', async (req, res) => {
 
 
 
+
+app.get('/posts', async (req, res) => {
+  try {
+    // Sélectionner tous les posts avec les informations de l'utilisateur associé
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`uuid, src`)
+      .eq('type', 'post')
+
+    if (error) {
+      throw error;
+    }
+
+    // Retourner les données avec les informations utilisateur
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des posts :', error.message);
+    res.status(500).json({ error: 'Erreur lors de la récupération des posts' });
+  }
+});
+
+
+
 app.get('/api/comments/:postId', async (req, res) => {
     try {
         const postId = req.params.postId;
