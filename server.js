@@ -501,7 +501,7 @@ app.get('/api/shorts/:userId', async (req, res) => {
         const usersInfoPromises = allPostsData.map(async post => {
             const { data: userInfo, error: userError } = await supabase
                 .from('users_infos')
-                .select('username, avatar, badge')
+                .select('uuid, username, avatar, badge')
                 .eq('uuid', post.uuid)
                 .single();
 
@@ -657,7 +657,7 @@ app.get('/api/shorts/:userId', async (req, res) => {
                     type: adData.ad_type,
                     url: adData.URL,
                     website: adData.website,
-                    user: { username: userData.username, avatar: userData.avatar, badge: userData.badge }
+                    user: {uuid: userData.uuid, username: userData.username, avatar: userData.avatar, badge: userData.badge }
                 });
             }
         }
