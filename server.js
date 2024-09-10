@@ -693,7 +693,6 @@ app.get('/exploare', async (req, res) => {
   }
 });
 
-
 app.get('/api/friends/:userId', async (req, res) => {
   const { userId } = req.params;
 
@@ -713,16 +712,19 @@ app.get('/api/friends/:userId', async (req, res) => {
     let { data: users, error: userError } = await supabase
       .from('users_infos')
       .select('uuid, avatar, username')
-      .in('uuid', toIds);  // Remplacer `uuid` par `userId` pour correspondre avec `toid`
+      .in('uuid', toIds);  // Assurer que `uuid` correspond bien à `toid`
 
     if (userError) throw userError;
 
     // 4. Associer `closed_friend` à chaque utilisateur
     const usersWithFriendsStatus = users.map(user => {
-      const follow = follows.find(f => f.toid === user.userId); // Trouver l'entrée correspondante dans `follows`
+      // Trouver l'entrée correspondante dans `follows`
+      const follow = follows.find(f => f.toid === user.uuid);
+
+      // Si `follow` existe, on associe `closed_friend`, sinon on laisse false par défaut
       return {
         ...user,
-        closed_friend: follow.closed_friend  // Ajouter `closed_friend` à chaque utilisateur
+        closed_friend: follow ? follow.closed_friend : false
       };
     });
 
@@ -732,6 +734,7 @@ app.get('/api/friends/:userId', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 
 
