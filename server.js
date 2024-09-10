@@ -694,6 +694,47 @@ app.get('/exploare', async (req, res) => {
 });
 
 
+app.get('/api/friends/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // 1. Fetcher les utilisateurs suivis par `fromId` depuis la table `follow`
+    let { data: follows, error: followError } = await supabase
+      .from('follow')
+      .select('toid, closed_friend')
+      .eq('fromid', userId);
+
+    if (followError) throw followError;
+
+    // 2. Extraire les `toId` pour récupérer les informations des utilisateurs suivis
+    const toIds = follows.map(follow => follow.toid);
+
+    // 3. Fetcher les informations des utilisateurs suivis depuis la table `users_infos`
+    let { data: users, error: userError } = await supabase
+      .from('users_infos')
+      .select('userId, avatar, username')
+      .in('userId', toIds);  // Remplacer `uuid` par `userId` pour correspondre avec `toid`
+
+    if (userError) throw userError;
+
+    // 4. Associer `closed_friend` à chaque utilisateur
+    const usersWithFriendsStatus = users.map(user => {
+      const follow = follows.find(f => f.toid === user.userId); // Trouver l'entrée correspondante dans `follows`
+      return {
+        ...user,
+        closed_friend: follow ? follow.closed_friend : false  // Ajouter `closed_friend` à chaque utilisateur
+      };
+    });
+
+    // 5. Retourner la réponse avec les informations des utilisateurs suivis et `closed_friend`
+    res.status(200).json(usersWithFriendsStatus);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 
 app.get('/api/comments/:postId', async (req, res) => {
     try {
