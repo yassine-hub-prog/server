@@ -15,7 +15,7 @@ app.get('/contact/:contact_id/messages', async (req, res) => {
     // Récupérer les informations du contact
     const { data: userData, error: userError } = await supabase
       .from('users_infos')
-      .select('avatar, username, badge')
+      .select('avatar, username, badge, image_updated_at')
       .eq('uuid', contact_id)
       .single();
 
