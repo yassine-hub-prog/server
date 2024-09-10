@@ -712,7 +712,7 @@ app.get('/api/friends/:userId', async (req, res) => {
     // 3. Fetcher les informations des utilisateurs suivis depuis la table `users_infos`
     let { data: users, error: userError } = await supabase
       .from('users_infos')
-      .select('userId, avatar, username')
+      .select('uuid, avatar, username')
       .in('uuid', toIds);  // Remplacer `uuid` par `userId` pour correspondre avec `toid`
 
     if (userError) throw userError;
