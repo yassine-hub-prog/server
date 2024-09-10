@@ -722,7 +722,7 @@ app.get('/api/friends/:userId', async (req, res) => {
       const follow = follows.find(f => f.toid === user.userId); // Trouver l'entrée correspondante dans `follows`
       return {
         ...user,
-        closed_friend: follow ? follow.closed_friend : false  // Ajouter `closed_friend` à chaque utilisateur
+        closed_friend: follow.closed_friend  // Ajouter `closed_friend` à chaque utilisateur
       };
     });
 
