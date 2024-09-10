@@ -693,6 +693,42 @@ app.get('/exploare', async (req, res) => {
   }
 });
 
+
+app.post('/api/save-close-friends/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { friends } = req.body;
+
+  try {
+    if (!Array.isArray(friends) || friends.length === 0) {
+      return res.status(400).json({ error: 'No friends provided' });
+    }
+
+    // Pour chaque ami, on met à jour la colonne `closed_friend` dans la table `follow`
+    for (const friend of friends) {
+      const { toid, closed_friend } = friend;  // `toid` est l'ID de l'ami et `closed_friend` est true ou false
+
+      // Mise à jour de la colonne `closed_friend` dans la table `follow`
+      let { error } = await supabase
+        .from('follow')
+        .update({ closed_friend })
+        .eq('fromid', userId)
+        .eq('toid', toid);
+
+      if (error) {
+        throw error;  // S'il y a une erreur, on arrête l'opération
+      }
+    }
+
+    // Répondre avec succès si tout s'est bien passé
+    res.status(200).json({ message: 'Close Friends updated successfully!' });
+
+  } catch (error) {
+    // En cas d'erreur, retourner une réponse avec le message d'erreur
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.get('/api/friends/:userId', async (req, res) => {
   const { userId } = req.params;
 
