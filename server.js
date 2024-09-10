@@ -61,7 +61,7 @@ app.get('/api/UserSearch/:username', async (req, res) => {
 
         const { data: userData, error: userError } = await supabase
             .from('users_infos')
-            .select('uuid, username, avatar, badge')
+            .select('uuid, username, avatar, badge, image_updated_at')
             .like('username', '%'+username+'%');
 
         if (userError) {
