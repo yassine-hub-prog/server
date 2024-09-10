@@ -713,7 +713,7 @@ app.get('/api/friends/:userId', async (req, res) => {
     let { data: users, error: userError } = await supabase
       .from('users_infos')
       .select('userId, avatar, username')
-      .in('userId', toIds);  // Remplacer `uuid` par `userId` pour correspondre avec `toid`
+      .in('uuid', toIds);  // Remplacer `uuid` par `userId` pour correspondre avec `toid`
 
     if (userError) throw userError;
 
