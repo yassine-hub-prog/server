@@ -501,7 +501,7 @@ app.get('/api/shorts/:userId', async (req, res) => {
         const usersInfoPromises = allPostsData.map(async post => {
             const { data: userInfo, error: userError } = await supabase
                 .from('users_infos')
-                .select('uuid, username, avatar, badge')
+                .select('uuid, username, avatar, badge, image_updated_at')
                 .eq('uuid', post.uuid)
                 .single();
 
