@@ -7,8 +7,8 @@ const app = express();
 app.use(cors());
 
 
-app.post('/register', async (req, res) => {
-    const { email, password, username } = req.body;
+app.post('/register/:email/:password/:username', async (req, res) => {
+    const { email, password, username } = req.params;
     
     // Step 1: Register the user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
