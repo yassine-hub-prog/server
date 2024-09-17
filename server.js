@@ -7,6 +7,32 @@ const app = express();
 app.use(cors());
 
 
+app.post('/register', async (req, res) => {
+    const { email, password, username } = req.body;
+    
+    // Step 1: Register the user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+    });
+
+    if (authError) {
+        return res.status(400).json({ error: authError.message });
+    }
+
+    // Step 2: Insert the user into the 'users' table
+    const { data: userData, error: userError } = await supabase
+        .from('users_infos')
+        .insert([{ username, email, uuid: authData.user.id }]);
+
+    if (userError) {
+        return res.status(400).json({ error: userError.message });
+    }
+
+    res.status(200).json({ message: 'User registered successfully', userData });
+});
+
+
 app.get('/contact/:contact_id/messages', async (req, res) => {
   const { contact_id } = req.params;
   const { userId } = req.query;
