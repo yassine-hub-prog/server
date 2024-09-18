@@ -242,7 +242,7 @@ app.get('/api/contact/:userId', async (req, res) => {
             // Récupérer le dernier message du contact dont le statut est faux (false)
             const { data: lastMessageData, error: lastMessageError } = await supabase
                 .from('message')
-                .select('message, created_at')
+                .select('message, created_at, type')
                 .or(`and(fromid.eq.${id},toid.eq.${userId}),and(fromid.eq.${userId},toid.eq.${id})`)
                 .order('created_at', { ascending: false })
                 .limit(1)
