@@ -460,7 +460,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
                 const { data: adsData, error: adsError } = await supabase
                     .from('ads_random')
-                    .select('id, title, description, ad_type, src, uuid, website, country')
+                    .select('id, title, description, ad_type, src, uuid, website')
                     .limit(1);
 
                 if (adsError) {
@@ -489,7 +489,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                     title: adData.title,
                     content: adData.description,
                     type: adData.ad_type,
-                    url: adData.URL,
+                    src: adData.src,
                     website: adData.website,
                     user: { username: userData.username, avatar: userData.avatar, badge: userData.badge, updated_at: userData.image_updated_at }
                 });
