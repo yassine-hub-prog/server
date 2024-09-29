@@ -477,7 +477,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 // Récupérer les informations de l'utilisateur qui a posté le post publicitaire
                 const { data: userData, error: userError } = await supabase
                     .from('users_infos')
-                    .select('username, avatar, badge') // Ajouter les champs que vous souhaitez récupérer
+                    .select('username, avatar, badge, image_updated_at') // Ajouter les champs que vous souhaitez récupérer
                     .eq('uuid', adData.uuid)
                     .single();
         
