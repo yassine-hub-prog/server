@@ -344,7 +344,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 return null; // Ignorer cet utilisateur s'il y a une erreur
             }
 
-            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge };
+            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge, updated_at: userInfo.image_updated_at };
         });
 
         // Attendre que toutes les requêtes pour les informations des utilisateurs soient terminées
