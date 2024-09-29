@@ -456,32 +456,36 @@ app.get('/api/posts/following/:userId', async (req, res) => {
         const postsWithAds = [];
         for (let i = 0; i < allPostsData.length; i++) {
             postsWithAds.push(allPostsData[i]);
+        
             if ((i + 1) % 4 === 0 && i !== allPostsData.length - 1) {
-                // Récupérer un post publicitaire (ads) aléatoire depuis la table adsrandom
+                // Récupérer un post publicitaire aléatoire dont la date actuelle est comprise entre la start_date et la end_date
                 const { data: adsData, error: adsError } = await supabase
                     .from('ads_random')
-                    .select('id, title, description, ad_type, src, uuid, website')
-                    .limit(1);
-
+                    .select('id, title, description, ad_type, src, uuid, website, start_date, end_date')
+                    .lt('start_date', new Date().toISOString()) // `start_date` doit être inférieure ou égale à aujourd'hui
+                    .gt('end_date', new Date().toISOString())   // `end_date` doit être supérieure ou égale à aujourd'hui
+                    .limit(1)
+                    .single(); // Utiliser single pour récupérer un seul élément
+        
                 if (adsError) {
                     console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
                     return res.status(500).send(adsError);
                 }
-
-                const adData = adsData[0]; // Récupérer les données du post publicitaire
-
+        
+                const adData = adsData; // Récupérer les données du post publicitaire
+        
                 // Récupérer les informations de l'utilisateur qui a posté le post publicitaire
                 const { data: userData, error: userError } = await supabase
                     .from('users_infos')
                     .select('username, avatar, badge') // Ajouter les champs que vous souhaitez récupérer
                     .eq('uuid', adData.uuid)
                     .single();
-
+        
                 if (userError) {
                     console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
                     return res.status(500).send('Erreur lors de la récupération des informations utilisateur depuis Supabase.');
                 }
-
+        
                 // Ajouter les informations de l'utilisateur à l'annonce publicitaire
                 postsWithAds.push({
                     id: adData.id,
@@ -495,6 +499,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 });
             }
         }
+
 
 
         res.status(200).json({ posts: postsWithAds });
