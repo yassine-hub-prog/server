@@ -846,7 +846,6 @@ app.get('/api/comments/:postId', async (req, res) => {
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
-
 app.get('/api/posts/popular/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -960,6 +959,7 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
+
 
 
 
