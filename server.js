@@ -847,7 +847,6 @@ app.get('/api/comments/:postId', async (req, res) => {
     }
 });
 
-
 app.get('/api/posts/popular/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -867,46 +866,62 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
             // Récupérer le nombre de likes pour ce post
             const { data: likesData, error: likesError } = await supabase
                 .from('like')
-                .select('id')
+                .select('id, user_id') // Inclure user_id pour vérifier si l'utilisateur a liké
                 .eq('post_id', post.id);
 
             if (likesError) {
                 console.error('Erreur lors de la récupération des likes depuis Supabase:', likesError.message);
-                return 0; // Retourner 0 likes en cas d'erreur
+                return null; // Retourner null en cas d'erreur
             }
 
             const likesCount = likesData.length;
 
+            // Vérifier si l'utilisateur a liké ce post
+            const isLikedByUser = likesData.some(like => like.user_id === userId);
+
             // Récupérer le nombre de commentaires pour ce post
             const { data: commentsData, error: commentsError } = await supabase
                 .from('comments')
-                .select('id')
+                .select('text, user_id') // Inclure user_id pour les commentaires
                 .eq('post_id', post.id);
 
             if (commentsError) {
                 console.error('Erreur lors de la récupération des commentaires depuis Supabase:', commentsError.message);
-                return 0; // Retourner 0 commentaires en cas d'erreur
+                return null; // Retourner null en cas d'erreur
             }
 
             const commentsCount = commentsData.length;
+
+            // Fonction pour choisir un commentaire aléatoire
+            const randomComment = () => {
+                if (commentsData.length > 0) {
+                    return commentsData[Math.floor(Math.random() * commentsData.length)];
+                }
+                return null; // Aucun commentaire disponible
+            };
 
             // Retourner la somme des likes et des commentaires
             return {
                 post,
                 totalEngagement: likesCount + commentsCount,
                 likesCount,
-                commentsCount
+                commentsCount,
+                isLikedByUser,
+                randomComment: randomComment()
             };
         });
 
         // Attendre que toutes les requêtes pour les likes et commentaires soient terminées
         const postsWithEngagement = await Promise.all(likesAndCommentsPromises);
 
+        // Filtrer les posts en cas d'erreur (null)
+        const validPostsWithEngagement = postsWithEngagement.filter(post => post !== null);
+
         // Trier les posts par le total d'engagements (likes + commentaires)
-        postsWithEngagement.sort((a, b) => b.totalEngagement - a.totalEngagement);
+        validPostsWithEngagement.sort((a, b) => b.totalEngagement - a.totalEngagement);
 
         // Limiter les posts à un nombre défini (par exemple, les 10 plus populaires)
-        const popularPosts = postsWithEngagement.slice(0, 10);
+        const popularPosts = validPostsWithEngagement.slice(0, 10);
 
         // Récupérer les informations des utilisateurs pour chaque post populaire
         const usersInfoPromises = popularPosts.map(async postWithEngagement => {
@@ -933,6 +948,8 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
             post.likesCount = postWithEngagement.likesCount;
             post.commentsCount = postWithEngagement.commentsCount;
             post.totalEngagement = postWithEngagement.totalEngagement;
+            post.isLikedByUser = postWithEngagement.isLikedByUser;
+            post.randomComment = postWithEngagement.randomComment; // Ajout du commentaire aléatoire
             post.user = usersInfoResults[index];
         });
 
@@ -943,6 +960,7 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
+
 
 
 
