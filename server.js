@@ -848,5 +848,103 @@ app.get('/api/comments/:postId', async (req, res) => {
 });
 
 
+app.get('/api/posts/popular/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        // Récupérer tous les posts
+        const { data: allPostsData, error: allPostsError } = await supabase
+            .from('posts')
+            .select('id, src, text, type, tage, hashtag, uuid'); // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
+
+        if (allPostsError) {
+            console.error('Erreur lors de la récupération des posts depuis Supabase:', allPostsError.message);
+            return res.status(500).send('Erreur lors de la récupération des posts depuis Supabase.');
+        }
+
+        // Récupérer le nombre de likes et de commentaires pour chaque post
+        const likesAndCommentsPromises = allPostsData.map(async post => {
+            // Récupérer le nombre de likes pour ce post
+            const { data: likesData, error: likesError } = await supabase
+                .from('like')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (likesError) {
+                console.error('Erreur lors de la récupération des likes depuis Supabase:', likesError.message);
+                return 0; // Retourner 0 likes en cas d'erreur
+            }
+
+            const likesCount = likesData.length;
+
+            // Récupérer le nombre de commentaires pour ce post
+            const { data: commentsData, error: commentsError } = await supabase
+                .from('comments')
+                .select('id')
+                .eq('post_id', post.id);
+
+            if (commentsError) {
+                console.error('Erreur lors de la récupération des commentaires depuis Supabase:', commentsError.message);
+                return 0; // Retourner 0 commentaires en cas d'erreur
+            }
+
+            const commentsCount = commentsData.length;
+
+            // Retourner la somme des likes et des commentaires
+            return {
+                post,
+                totalEngagement: likesCount + commentsCount,
+                likesCount,
+                commentsCount
+            };
+        });
+
+        // Attendre que toutes les requêtes pour les likes et commentaires soient terminées
+        const postsWithEngagement = await Promise.all(likesAndCommentsPromises);
+
+        // Trier les posts par le total d'engagements (likes + commentaires)
+        postsWithEngagement.sort((a, b) => b.totalEngagement - a.totalEngagement);
+
+        // Limiter les posts à un nombre défini (par exemple, les 10 plus populaires)
+        const popularPosts = postsWithEngagement.slice(0, 10);
+
+        // Récupérer les informations des utilisateurs pour chaque post populaire
+        const usersInfoPromises = popularPosts.map(async postWithEngagement => {
+            const post = postWithEngagement.post;
+            const { data: userInfo, error: userError } = await supabase
+                .from('users_infos')
+                .select('username, avatar, badge, image_updated_at')
+                .eq('uuid', post.uuid)
+                .single();
+
+            if (userError) {
+                console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
+                return null; // Ignorer cet utilisateur s'il y a une erreur
+            }
+
+            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge, updated_at: userInfo.image_updated_at };
+        });
+
+        const usersInfoResults = await Promise.all(usersInfoPromises);
+
+        // Ajouter les informations utilisateur aux posts populaires
+        popularPosts.forEach((postWithEngagement, index) => {
+            const post = postWithEngagement.post;
+            post.likesCount = postWithEngagement.likesCount;
+            post.commentsCount = postWithEngagement.commentsCount;
+            post.totalEngagement = postWithEngagement.totalEngagement;
+            post.user = usersInfoResults[index];
+        });
+
+        // Retourner les posts populaires
+        res.status(200).json({ posts: popularPosts });
+    } catch (error) {
+        console.error('Erreur:', error.message);
+        res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
+    }
+});
+
+
+
 
 app.listen(3000, () => console.log('Server is listening on port 3000 🚀'));
