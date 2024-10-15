@@ -384,7 +384,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
         // Récupérer tous les posts des utilisateurs suivis depuis la table posts
         const { data: allPostsData, error: allPostsError } = await supabase
             .from('posts')
-            .select('id, src, text, type, tage, hashtag, uuid') // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
+            .select('id, src, text, type, uuid') // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
             .in('uuid', followedUserIds);
 
         if (allPostsError) {
