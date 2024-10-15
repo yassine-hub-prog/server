@@ -1,10 +1,66 @@
 const supabase = require('./supabase');
 const express = require('express');
 const cors = require('cors');
-
+const crypto = require('crypto'); 
 const app = express();
 
 app.use(cors());
+
+app.get('/start_msg/:uuid', async (req, res) => {
+    // Récupération du paramètre UUID depuis la requête
+    const { uuid } = req.params;
+
+    try {
+        // Récupération des informations de l'utilisateur dans la table 'users_infos'
+        const { data: checkedData, error: checkedError } = await supabase
+            .from('users_infos')
+            .select('msg_bool, public_key')
+            .eq('uuid', uuid)
+            .single();
+
+        // Gestion de l'erreur en cas de problème lors de la requête à la base de données
+        if (checkedError) {
+            return res.status(400).json({ error: checkedError.message });
+        }
+
+        // Vérification si msg_bool est false et public_key est null
+        if (checkedData.msg_bool === false && checkedData.public_key === null) {
+            // Action à exécuter si les deux conditions sont remplies
+            const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+                modulusLength: 2048,  // Length of the key in bits
+                publicKeyEncoding: { type: 'spki', format: 'pem' },
+                privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+            });
+
+            if(publicKey && privateKey) {
+                const { error } = await supabase
+                    .from('users_infos')
+                    .update({ public_key: publicKey , msg_bool: true})
+                    .eq('uuid', uuid)
+
+                res.status(200).json({privateKey});
+            }
+
+
+            // Par exemple, on peut envoyer un message d'erreur
+            return res.status(400).json({ error: 'Message non activé et clé publique manquante.' });
+        }
+
+        // Si aucune erreur, log des données pour debug
+        console.log('Données récupérées :', checkedData);
+
+        // Réponse réussie avec les données
+        res.status(200).json('le user a ete deja verifier');
+
+    } catch (error) {
+        // Gestion des erreurs inattendues
+        console.error('Erreur serveur:', error);
+        res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+});
+
+
+
 
 
 app.post('/register/:email/:password/:username', async (req, res) => {
@@ -20,7 +76,8 @@ app.post('/register/:email/:password/:username', async (req, res) => {
         return res.status(400).json({ error: authError.message });
     }
 
-    // Step 2: Insert the user into the 'users' table
+
+    // Step 3: Insert the user along with the public key into the 'users_infos' table
     const { data: userData, error: userError } = await supabase
         .from('users_infos')
         .insert([{ username, email, uuid: authData.user.id }]);
@@ -29,7 +86,8 @@ app.post('/register/:email/:password/:username', async (req, res) => {
         return res.status(400).json({ error: userError.message });
     }
 
-    res.status(200).json({ message: 'User registered successfully', userData });
+    // Step 4: Return the private key to the user
+    res.status(200).json({ message: 'User registered successfully' });
 });
 
 
@@ -302,6 +360,9 @@ app.get('/api/contact/:userId', async (req, res) => {
     }
 });
 
+
+
+
 app.get('/api/posts/following/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -417,7 +478,8 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                 return null; // Retourner null en cas d'erreur
             }
 
-            return randomCommentData[0]?.comment || null; // Commentaire aléatoire ou null s'il n'y a pas de commentaire
+            return (randomCommentData && randomCommentData[0] && randomCommentData[0].comment) || null;
+
         });
 
         // Attendre que toutes les requêtes pour les commentaires aléatoires soient terminées
@@ -520,7 +582,7 @@ app.get('/api/shorts/:userId', async (req, res) => {
         // Récupérer tous les posts des utilisateurs suivis depuis la table posts
         const { data: allPostsData, error: allPostsError } = await supabase
             .from('posts')
-            .select('id, src, text, type, tage, hashtag, uuid') // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
+            .select('id, src, text, type, uuid') // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
             .eq('type', 'video')
 
         if (allPostsError) {
@@ -614,7 +676,8 @@ app.get('/api/shorts/:userId', async (req, res) => {
                 return null; // Retourner null en cas d'erreur
             }
 
-            return randomCommentData[0]?.comment || null; // Commentaire aléatoire ou null s'il n'y a pas de commentaire
+            return (randomCommentData && randomCommentData[0] && randomCommentData[0].comment) || null;
+
         });
 
         // Attendre que toutes les requêtes pour les commentaires aléatoires soient terminées
@@ -846,110 +909,83 @@ app.get('/api/comments/:postId', async (req, res) => {
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
+
+
 app.get('/api/posts/popular/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
 
-        // Récupérer tous les posts
+        // Récupérer tous les posts avec la colonne total_engagement
         const { data: allPostsData, error: allPostsError } = await supabase
-            .from('posts')
-            .select('id, src, text, type, tage, hashtag, uuid'); // Ajouter uuid pour récupérer l'ID de l'utilisateur associé à chaque post
+            .from('post')
+            .select('id, src, text, type, uuid, total_engagement'); // Inclure total_engagement
 
         if (allPostsError) {
             console.error('Erreur lors de la récupération des posts depuis Supabase:', allPostsError.message);
             return res.status(500).send('Erreur lors de la récupération des posts depuis Supabase.');
         }
 
-        // Récupérer le nombre de likes et de commentaires pour chaque post
-        const likesAndCommentsPromises = allPostsData.map(async post => {
-            // Récupérer le nombre de likes pour ce post
-            const { data: likesData, error: likesError } = await supabase
-                .from('like')
-                .select('id, user_id') // Inclure user_id pour vérifier si l'utilisateur a liké
-                .eq('post_id', post.id);
+        // Récupérer le nombre de likes et vérifier si l'utilisateur a liké chaque post
+        const likesPromises = allPostsData.map(async post => {
+            try {
+                const { data: likesData, error: likesError } = await supabase
+                    .from('like')
+                    .select('id, user_id')
+                    .eq('post_id', post.id);
 
-            if (likesError) {
-                console.error('Erreur lors de la récupération des likes depuis Supabase:', likesError.message);
-                return null; // Retourner null en cas d'erreur
+                if (likesError) throw new Error(likesError.message);
+
+                const isLikedByUser = likesData.some(like => like.user_id === userId);
+
+                // Retourner l'information pour chaque post
+                return {
+                    post,
+                    isLikedByUser
+                };
+            } catch (error) {
+                console.error('Erreur lors du traitement d\'un post:', error.message);
+                return null; // Retourner null en cas d'erreur pour ce post
             }
-
-            const likesCount = likesData.length;
-
-            // Vérifier si l'utilisateur a liké ce post
-            const isLikedByUser = likesData.some(like => like.user_id === userId);
-
-            // Récupérer le nombre de commentaires pour ce post
-            const { data: commentsData, error: commentsError } = await supabase
-                .from('comments')
-                .select('text, user_id') // Inclure user_id pour les commentaires
-                .eq('post_id', post.id);
-
-            if (commentsError) {
-                console.error('Erreur lors de la récupération des commentaires depuis Supabase:', commentsError.message);
-                return null; // Retourner null en cas d'erreur
-            }
-
-            const commentsCount = commentsData.length;
-
-            // Fonction pour choisir un commentaire aléatoire
-            const randomComment = () => {
-                if (commentsData.length > 0) {
-                    return commentsData[Math.floor(Math.random() * commentsData.length)];
-                }
-                return null; // Aucun commentaire disponible
-            };
-
-            // Retourner la somme des likes et des commentaires
-            return {
-                post,
-                totalEngagement: likesCount + commentsCount,
-                likesCount,
-                commentsCount,
-                isLikedByUser,
-                randomComment: randomComment()
-            };
         });
 
-        // Attendre que toutes les requêtes pour les likes et commentaires soient terminées
-        const postsWithEngagement = await Promise.all(likesAndCommentsPromises);
+        const postsWithLikes = await Promise.all(likesPromises);
+        const validPostsWithLikes = postsWithLikes.filter(post => post !== null);
 
-        // Filtrer les posts en cas d'erreur (null)
-        const validPostsWithEngagement = postsWithEngagement.filter(post => post !== null);
-
-        // Trier les posts par le total d'engagements (likes + commentaires)
-        validPostsWithEngagement.sort((a, b) => b.totalEngagement - a.totalEngagement);
-
-        // Limiter les posts à un nombre défini (par exemple, les 10 plus populaires)
-        const popularPosts = validPostsWithEngagement.slice(0, 10);
+        // Trier les posts par engagement total (utiliser la colonne total_engagement)
+        validPostsWithLikes.sort((a, b) => b.post.total_engagement - a.post.total_engagement);
+        const popularPosts = validPostsWithLikes.slice(0, 10);
 
         // Récupérer les informations des utilisateurs pour chaque post populaire
-        const usersInfoPromises = popularPosts.map(async postWithEngagement => {
-            const post = postWithEngagement.post;
-            const { data: userInfo, error: userError } = await supabase
-                .from('users_infos')
-                .select('username, avatar, badge, image_updated_at')
-                .eq('uuid', post.uuid)
-                .single();
+        const usersInfoPromises = popularPosts.map(async postWithLikes => {
+            const post = postWithLikes.post;
+            try {
+                const { data: userInfo, error: userError } = await supabase
+                    .from('users_infos')
+                    .select('username, avatar, badge, image_updated_at')
+                    .eq('uuid', post.uuid)
+                    .single();
 
-            if (userError) {
-                console.error('Erreur lors de la récupération des informations utilisateur depuis Supabase:', userError.message);
-                return null; // Ignorer cet utilisateur s'il y a une erreur
+                if (userError) throw new Error(userError.message);
+
+                return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge, updated_at: userInfo.image_updated_at };
+            } catch (error) {
+                console.error('Erreur lors de la récupération des informations utilisateur:', error.message);
+                return null; // Retourner null en cas d'erreur pour cet utilisateur
             }
-
-            return { username: userInfo.username, avatar: userInfo.avatar, badge: userInfo.badge, updated_at: userInfo.image_updated_at };
         });
 
         const usersInfoResults = await Promise.all(usersInfoPromises);
 
         // Ajouter les informations utilisateur aux posts populaires
-        popularPosts.forEach((postWithEngagement, index) => {
-            const post = postWithEngagement.post;
-            post.likesCount = postWithEngagement.likesCount;
-            post.commentsCount = postWithEngagement.commentsCount;
-            post.totalEngagement = postWithEngagement.totalEngagement;
-            post.isLikedByUser = postWithEngagement.isLikedByUser;
-            post.randomComment = postWithEngagement.randomComment; // Ajout du commentaire aléatoire
-            post.user = usersInfoResults[index];
+        popularPosts.forEach((postWithLikes, index) => {
+            const post = postWithLikes.post;
+            post.isLikedByUser = postWithLikes.isLikedByUser;
+
+            if (usersInfoResults[index]) {
+                post.user = usersInfoResults[index];
+            } else {
+                post.user = { username: 'Utilisateur inconnu', avatar: null, badge: null, updated_at: null };
+            }
         });
 
         // Retourner les posts populaires
@@ -959,6 +995,9 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
         res.status(500).send('Erreur lors de la récupération des données depuis Supabase.');
     }
 });
+
+
+
 
 
 
