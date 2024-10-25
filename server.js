@@ -997,6 +997,31 @@ app.get('/api/posts/popular/:userId', async (req, res) => {
 });
 
 
+app.get('/api/recomanded_users/:limit', async (req, res) => {
+    try {
+        const { limit } = req.params;
+
+        const { data: userData, error: userError } = await supabase
+            .from('users_infos_random')
+            .select('uuid, username, avatar, badge, image_updated_at, token')
+            .limit(limit); // Limite à 5 utilisateurs
+
+        if (userError) {
+            throw userError;
+        }
+
+        if (!userData || userData.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json(userData);
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching user', error: error.message });
+    }
+});
+
+
+
 
 
 
