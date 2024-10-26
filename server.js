@@ -508,7 +508,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                     .lt('start_date', new Date().toISOString())
                     .gt('end_date', new Date().toISOString())
                     .limit(1)
-                    .single();
+                    .maybeSingle()
 
                 if (adsError) {
                     console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
