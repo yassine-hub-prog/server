@@ -383,7 +383,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
         const { data: allPostsData, error: allPostsError } = await supabase
             .from('posts')
             .select('id, src, text, type, uuid')
-            .or(`uuid.in.${followedUserIds},uuid.eq.${userId}`);
+            .in('uuid', followedUserIds);
 
         if (allPostsError) {
             console.error('Erreur lors de la récupération des posts depuis Supabase:', allPostsError.message);
