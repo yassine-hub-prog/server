@@ -526,7 +526,7 @@ app.get('/api/posts/following/:userId', async (req, res) => {
                     .lt('start_date', new Date().toISOString()) // `start_date` doit être inférieure ou égale à aujourd'hui
                     .gt('end_date', new Date().toISOString())   // `end_date` doit être supérieure ou égale à aujourd'hui
                     .limit(1)
-                    .single(); // Utiliser single pour récupérer un seul élément
+                    .maybeSingle()
         
                 if (adsError) {
                     console.error('Erreur lors de la récupération du post publicitaire depuis Supabase:', adsError.message);
